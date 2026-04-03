@@ -5,11 +5,13 @@ from crewai_tools import ScrapeWebsiteTool
 from tools.custom_tools import search_tool, final_answer_tool
 
 llm_researcher = LLM(model='ollama/qwen2.5:7b', base_url='http://localhost:11434', temperature=0.0)
-llm_lite = LLM(model='ollama/qwen3.5:latest', base_url='http://localhost:11434', temperature=0.0)
+llm_lite = LLM(model='ollama/qwen2.5:7b', base_url='http://localhost:11434', temperature=0.0)
 
 
 @CrewBase
-class PesquisaAuditoriaCrew():
+class PesquisaCrew():
+    """Pesquisa e estrutura dados de UMA ferramenta por execução."""
+
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
 
@@ -28,16 +30,6 @@ class PesquisaAuditoriaCrew():
     def data_structurer(self) -> Agent:
         return Agent(
             config=self.agents_config['data_structurer'],
-            llm=llm_lite,
-            tools=[],
-            allow_delegation=False,
-            verbose=True
-        )
-
-    @agent
-    def sre_auditor(self) -> Agent:
-        return Agent(
-            config=self.agents_config['sre_auditor'],
             llm=llm_lite,
             tools=[],
             allow_delegation=False,
@@ -64,13 +56,31 @@ class PesquisaAuditoriaCrew():
             context=[self.deep_extraction_task()],
         )
 
+    @crew
+    def crew(self) -> Crew:
+        return Crew(agents=self.agents, tasks=self.tasks, process=Process.sequential, verbose=True)
+
+
+@CrewBase
+class AuditoriaCrew():
+    """Audita todas as ferramentas de uma vez com os dados já agregados."""
+
+    agents_config = 'config/agents.yaml'
+    tasks_config = 'config/tasks.yaml'
+
+    @agent
+    def sre_auditor(self) -> Agent:
+        return Agent(
+            config=self.agents_config['sre_auditor'],
+            llm=llm_lite,
+            tools=[],
+            allow_delegation=False,
+            verbose=True
+        )
+
     @task
     def audit_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['audit_task'],
-            agent=self.sre_auditor(),
-            context=[self.structure_task()],
-        )
+        return Task(config=self.tasks_config['audit_task'], agent=self.sre_auditor())
 
     @crew
     def crew(self) -> Crew:

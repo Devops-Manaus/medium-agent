@@ -3,7 +3,7 @@ from datetime import datetime
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 
-llm_qa = LLM(model='ollama/qwen3.5:latest', base_url='http://localhost:11434', temperature=0.0)
+llm_qa = LLM(model='ollama/qwen2.5:7b', base_url='http://localhost:11434', temperature=0.0)
 llm_writer = LLM(
     model='ollama/deepseek-r1:8b',
     base_url='http://localhost:11434',

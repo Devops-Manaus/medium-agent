@@ -1,123 +1,110 @@
 research_task:
   description: >
-    PROTOCOLO DE PESQUISA OBRIGATÓRIA — TODAS AS FERRAMENTAS EM {ferramentas_alvo}:
+    PESQUISA DIRECIONADA — FERRAMENTA: {ferramenta_atual}
 
-    Leia o campo {ferramentas_alvo} e identifique cada ferramenta listada.
-    Você DEVE pesquisar CADA ferramenta individualmente seguindo a ordem de fontes abaixo.
-    NÃO chame 'final_answer' antes de completar as buscas de TODAS as ferramentas.
+    Sua missão é pesquisar EXCLUSIVAMENTE a ferramenta "{ferramenta_atual}".
+    Não pesquise nenhuma outra ferramenta nesta task.
 
-    ORDEM OBRIGATÓRIA DE FONTES (execute nesta sequência para cada ferramenta):
+    Execute as buscas nesta ordem usando a tool 'Search SerpAPI':
 
     FONTE 1 — Documentação Oficial:
-      "[Nome da Ferramenta] {requisito_tecnico} official documentation"
+      "{ferramenta_atual} {requisito_tecnico} official documentation"
 
-    FONTE 2 — GitHub (código, issues, changelogs reais):
-      "[Nome da Ferramenta] {requisito_tecnico} site:github.com"
+    FONTE 2 — GitHub (código, issues, changelogs):
+      "{ferramenta_atual} {requisito_tecnico} site:github.com"
 
-    FONTE 3 — Reddit (experiências reais de uso):
-      "[Nome da Ferramenta] {contexto} site:reddit.com"
+    FONTE 3 — Reddit (experiências reais):
+      "{ferramenta_atual} {contexto} site:reddit.com"
 
-    FONTE 4 — Stack Overflow (problemas técnicos reais):
-      "[Nome da Ferramenta] {requisito_tecnico} site:stackoverflow.com"
+    FONTE 4 — Stack Overflow (problemas técnicos):
+      "{ferramenta_atual} {requisito_tecnico} site:stackoverflow.com"
 
-    Repita as 4 buscas para CADA ferramenta em {ferramentas_alvo}, na ordem em que aparecem.
-    Só chame 'final_answer' depois de concluir todas as buscas de todas as ferramentas.
+    Só chame 'final_answer' após completar as 4 buscas.
 
     REGRAS:
     - Use APENAS a tool 'Search SerpAPI'.
-    - Registre os links e snippets separados por ferramenta e por tipo de fonte.
+    - Registre links e snippets de cada fonte separadamente.
     - Apenas fatos verificáveis. Sem introduções ou conclusões.
 
   expected_output: >
-    Texto em markdown com uma seção por ferramenta de {ferramentas_alvo}.
-    Cada seção deve ter subseções por tipo de fonte:
+    Texto em markdown sobre {ferramenta_atual} com subseções por tipo de fonte:
 
-    ## [Nome da Ferramenta]
+    ## {ferramenta_atual}
     ### Documentação Oficial
-    - [fatos e links encontrados]
+    - [fatos e links]
     ### GitHub
-    - [fatos e links encontrados]
+    - [fatos e links]
     ### Reddit
-    - [fatos e links encontrados]
+    - [fatos e links]
     ### Stack Overflow
-    - [fatos e links encontrados]
+    - [fatos e links]
 
 deep_extraction_task:
   description: >
-    EXTRAÇÃO PROFUNDA — LEITURA DIRETA DAS PÁGINAS ENCONTRADAS:
+    EXTRAÇÃO PROFUNDA — FERRAMENTA: {ferramenta_atual}
 
-    Você receberá links de múltiplas fontes para as ferramentas em {ferramentas_alvo}.
-    Sua função é usar 'Read a website content' para ler os links mais relevantes
-    e extrair dados técnicos detalhados focados em: {requisito_tecnico}
+    Leia os links encontrados na task anterior sobre "{ferramenta_atual}".
+    Use 'Read a website content' para acessar os links mais relevantes.
 
-    REGRA CRÍTICA DE FERRAMENTA:
+    REGRA CRÍTICA:
     - Use EXCLUSIVAMENTE a tool 'Read a website content'.
-    - É COMPLETAMENTE PROIBIDO chamar 'Search SerpAPI' nesta task.
-    - Não faça novas buscas. Leia os links disponíveis no contexto.
+    - É PROIBIDO chamar 'Search SerpAPI' nesta task.
 
-    PRIORIDADE DE LEITURA (leia nesta ordem quando disponível):
+    PRIORIDADE DE LEITURA:
     1. Documentação oficial
     2. Issues/README do GitHub
     3. Threads do Reddit ou Stack Overflow com mais votos
 
     PASSO A PASSO:
-    1. Leia o output da task anterior e identifique as URLs por ferramenta e por fonte.
-    2. Para cada ferramenta em {ferramentas_alvo}, selecione os 3 links mais relevantes
-       considerando o contexto: {contexto} e requisito: {requisito_tecnico}.
-    3. Acesse cada link com 'Read a website content' e extraia dados técnicos.
-    4. NUNCA acesse o mesmo link duas vezes.
-    5. Após ler todos os links selecionados (máximo 3 por ferramenta), escreva o relatório.
+    1. Identifique as URLs da task anterior.
+    2. Selecione os 3 links mais relevantes para: {requisito_tecnico}
+    3. Acesse cada link e extraia dados técnicos.
+    4. Nunca acesse o mesmo link duas vezes.
+    5. Após ler os 3 links, escreva o relatório final.
 
-    Se um link não carregar, pule para o próximo sem repetir.
-    Se não encontrar uma informação, registre "Não encontrado" e avance.
+    Se um link não carregar, pule para o próximo.
 
   expected_output: >
-    Relatório técnico com uma seção por ferramenta de {ferramentas_alvo}, focado em:
-    {requisito_tecnico}
-
-    Cada seção deve conter dados extraídos diretamente das páginas lidas:
-    limites técnicos, arquitetura, licenciamento, custos ou qualquer dado relevante
-    para o contexto: {contexto}
+    Relatório técnico sobre {ferramenta_atual} com dados extraídos das páginas lidas,
+    focado em: {requisito_tecnico}
     Inclua a URL de origem de cada dado extraído.
 
 structure_task:
   description: >
-    Transforme os dados brutos da pesquisa em estrutura de dados padronizada.
+    Estruture os dados coletados sobre "{ferramenta_atual}" no formato JSON exigido.
 
-    Leia os dados de contexto e crie UMA entrada no array "fatos" para CADA ferramenta
-    que aparece em {ferramentas_alvo}. Se houver 3 ferramentas, o array terá 3 itens.
-    Se houver 2 ferramentas, o array terá 2 itens. Nunca omita uma ferramenta.
+    Crie exatamente UM objeto no array "fatos" para a ferramenta "{ferramenta_atual}".
 
-    Para cada ferramenta, preencha:
-    - ferramenta: nome exato da ferramenta
+    Preencha os campos:
+    - ferramenta: "{ferramenta_atual}" (nome exato)
     - arquitetura: descrição técnica baseada nos dados lidos
-    - limitacoes_conhecidas: lista de limitações, limites ou restrições encontradas,
-      considerando o requisito: {requisito_tecnico}
-    - fontes: lista de URLs utilizadas (pode ser vazia se não houver)
+    - limitacoes_conhecidas: lista de limitações relevantes para: {requisito_tecnico}
+    - fontes: lista de URLs utilizadas
 
-    Se os dados de uma ferramenta forem escassos, preencha com o que foi encontrado
-    e adicione "Dados insuficientes" em limitacoes_conhecidas.
+    Se os dados forem escassos, preencha com o que foi encontrado e adicione
+    "Dados insuficientes" em limitacoes_conhecidas.
 
     NÃO escreva introduções. Apenas o JSON.
 
   expected_output: >
-    Um objeto JSON válido com uma entrada por ferramenta de {ferramentas_alvo}:
-    {"fatos": [{"ferramenta": "Nome", "arquitetura": "descrição", "limitacoes_conhecidas": ["limite1"], "fontes": ["https://..."]}, ...]}
+    Um objeto JSON válido com exatamente uma entrada para {ferramenta_atual}:
+    {"fatos": [{"ferramenta": "{ferramenta_atual}", "arquitetura": "descrição", "limitacoes_conhecidas": ["limite1"], "fontes": ["https://..."]}]}
 
 audit_task:
   description: >
-    ANÁLISE OPERACIONAL — CONTEXTO: {contexto}
+    ANÁLISE COMPARATIVA — CONTEXTO: {contexto}
 
-    Com base nos dados estruturados recebidos, produza uma auditoria técnica comparativa
-    focada em: {requisito_tecnico}
+    Você receberá dados estruturados de TODAS as ferramentas em {ferramentas_alvo}.
+    Os dados estão no campo {dados_estruturados}.
 
-    REGRA FUNDAMENTAL: Baseie toda a análise EXCLUSIVAMENTE nas ferramentas e dados
-    presentes no campo "fatos" do contexto. Não avalie nem mencione ferramentas
-    que não estejam nos dados recebidos. Não invente dados ausentes.
+    Produza uma auditoria técnica comparativa focada em: {requisito_tecnico}
+
+    REGRA FUNDAMENTAL: Baseie toda a análise EXCLUSIVAMENTE nos dados recebidos.
+    Não avalie ferramentas que não estejam nos dados. Não invente dados ausentes.
 
     Analise e defina:
     1. Vencedor operacional para o contexto "{contexto}" com base nos dados disponíveis
-    2. Riscos SRE identificados nos dados (falhas, gargalos, limitações operacionais)
+    2. Riscos SRE identificados (falhas, gargalos, limitações operacionais)
     3. Custos ocultos ou restrições relevantes para "{requisito_tecnico}"
     4. Recomendação final objetiva e direta
 

@@ -1,6 +1,7 @@
 import glob
 import json
 import os
+import re
 import traceback
 from datetime import datetime as dt
 from crewai.flow.flow import Flow, start, listen
@@ -10,14 +11,22 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.panel import Panel
 
-from crews.search_audit_crew.search_audit_crew import PesquisaAuditoriaCrew
+from crews.search_audit_crew.search_audit_crew import PesquisaCrew, AuditoriaCrew
 from crews.write_validate_crew.write_validate_crew import EscritaValidacaoCrew
 from shared.logger import setup_run_logger, get_logger
+from shared.schemas import ExtracaoOutput
+from tools.custom_tools import validar_extracao, validar_auditoria
 
 load_dotenv()
 
 ARQUIVO_REFERENCIAS = 'output/referencias_pesquisa.txt'
 console = Console()
+
+
+def _parse_ferramentas(ferramentas_str: str) -> list[str]:
+    partes = re.split(r'\s+(?:e|vs\.?|versus|and)\s+|,\s*', ferramentas_str, flags=re.IGNORECASE)
+    return [p.strip() for p in partes if p.strip()]
+
 
 class TechAnalysisFlow(Flow):
     def __init__(self):
@@ -52,60 +61,113 @@ class TechAnalysisFlow(Flow):
     def executar_pesquisa(self):
         log = get_logger()
         t0 = dt.now()
-        console.print(f"\n[1/2] Iniciando Pesquisa e Auditoria para: [bold yellow]{self.inputs['ferramentas_alvo']}[/bold yellow]...")
-        log.info(f"[1/2] Etapa Pesquisa iniciada")
 
         if os.path.exists(ARQUIVO_REFERENCIAS):
             os.remove(ARQUIVO_REFERENCIAS)
 
-        self.state['dados_auditoria'] = "Nenhum dado extraído."
+        ferramentas = _parse_ferramentas(self.inputs['ferramentas_alvo'])
+        log.info(f"[1/3] Pesquisa iniciada | {len(ferramentas)} ferramenta(s): {ferramentas}")
+        console.print(f"\n[1/3] Pesquisando [bold yellow]{len(ferramentas)}[/bold yellow] ferramenta(s): {ferramentas}")
 
-        try:
-            crew_pesquisa = PesquisaAuditoriaCrew().crew()
-            resultado_pesquisa = crew_pesquisa.kickoff(inputs=self.inputs)
+        todos_fatos = []
 
-            self._salvar_metricas(resultado_pesquisa, "Pesquisa")
+        for i, ferramenta in enumerate(ferramentas, 1):
+            console.print(f"\n  [{i}/{len(ferramentas)}] Pesquisando: [bold cyan]{ferramenta}[/bold cyan]...")
+            log.info(f"  Iniciando pesquisa de: {ferramenta}")
 
-            if hasattr(resultado_pesquisa, 'tasks_output') and len(resultado_pesquisa.tasks_output) >= 2:
-                fatos_estruturados = resultado_pesquisa.tasks_output[-2].raw
-                auditoria_final = resultado_pesquisa.tasks_output[-1].raw
-                self.state['dados_auditoria'] = f"=== DADOS TÉCNICOS EXTRAÍDOS ===\n{fatos_estruturados}\n\n=== AUDITORIA SRE ===\n{auditoria_final}"
+            inputs_ferramenta = {**self.inputs, 'ferramenta_atual': ferramenta}
 
-                log.info(f"Task outputs recebidos ({len(resultado_pesquisa.tasks_output)} tasks)")
-                for i, t in enumerate(resultado_pesquisa.tasks_output):
-                    log.info(f"  tasks_output[{i}]: {str(t.raw)[:400]}")
-            else:
-                self.state['dados_auditoria'] = resultado_pesquisa.raw
-                log.info(f"Pesquisa raw output: {str(resultado_pesquisa.raw)[:400]}")
+            try:
+                resultado = PesquisaCrew().crew().kickoff(inputs=inputs_ferramenta)
+                self._salvar_metricas(resultado, f"Pesquisa:{ferramenta}")
 
-        except Exception as e:
-            log.error(f"[AVISO] Etapa Pesquisa falhou: {e}")
-            log.error(traceback.format_exc())
-            console.print(f"\n[bold red][AVISO] A auditoria falhou ou o Guardrail abortou: {e}[/bold red]")
-            console.print("[yellow]A resgatar dados parciais da extração e forçar a escrita do artigo...[/yellow]")
+                task_estrutura = resultado.tasks_output[-1]
+                ok, dados = validar_extracao(task_estrutura)
 
-            fatos_recuperados = "Dados estruturados não disponíveis."
-            if os.path.exists('output/debug_json_extracao.txt'):
-                with open('output/debug_json_extracao.txt', 'r', encoding='utf-8') as f:
-                    fatos_recuperados = f.read()
-                log.info(f"Dados recuperados de debug_json_extracao.txt ({len(fatos_recuperados)} chars)")
+                if ok:
+                    todos_fatos.extend(dados.fatos)
+                    log.info(f"  {ferramenta}: extração validada com sucesso")
+                else:
+                    log.warning(f"  {ferramenta}: extração inválida — {dados} | usando raw como fallback")
+                    todos_fatos_raw = task_estrutura.raw
+                    todos_fatos.append({
+                        "ferramenta": ferramenta,
+                        "arquitetura": todos_fatos_raw[:500] if todos_fatos_raw else "Não disponível",
+                        "limitacoes_conhecidas": ["Dados insuficientes — validação falhou"],
+                        "fontes": []
+                    })
 
-            self.state['dados_auditoria'] = f"=== DADOS TÉCNICOS EXTRAÍDOS (RECUPERADOS) ===\n{fatos_recuperados}\n\n=== AUDITORIA SRE ===\n[PREENCHER MANUALMENTE: A auditoria SRE falhou na formatação e foi ignorada]"
+            except Exception as e:
+                log.error(f"  {ferramenta}: pesquisa falhou — {e}")
+                log.error(traceback.format_exc())
+                console.print(f"  [bold red]Pesquisa de {ferramenta} falhou: {e}[/bold red]")
+                todos_fatos.append({
+                    "ferramenta": ferramenta,
+                    "arquitetura": "Não disponível — erro na pesquisa",
+                    "limitacoes_conhecidas": ["Dados insuficientes — erro na execução"],
+                    "fontes": []
+                })
 
-        duracao = (dt.now() - t0).total_seconds()
-        log.info(f"[1/2] Etapa Pesquisa concluída em {duracao:.1f}s")
-        return self.state['dados_auditoria']
+        duracao_pesquisa = (dt.now() - t0).total_seconds()
+        log.info(f"[1/3] Pesquisa concluída em {duracao_pesquisa:.1f}s | {len(todos_fatos)} ferramenta(s) coletadas")
+
+        dados_agregados = ExtracaoOutput(fatos=todos_fatos)
+        dados_json = json.dumps(dados_agregados.model_dump(), ensure_ascii=False)
+        log.info(f"dados_agregados: {dados_json[:600]}")
+
+        self.state['dados_estruturados'] = dados_json
+        return dados_json
 
     @listen(executar_pesquisa)
+    def executar_auditoria(self, dados_estruturados):
+        log = get_logger()
+        t0 = dt.now()
+        console.print("\n[2/3] Iniciando Auditoria SRE...")
+        log.info(f"[2/3] Auditoria iniciada | dados={len(dados_estruturados)} chars")
+
+        inputs_auditoria = {
+            **self.inputs,
+            'dados_estruturados': dados_estruturados,
+        }
+
+        auditoria_json = dados_estruturados  # fallback
+
+        try:
+            resultado_auditoria = AuditoriaCrew().crew().kickoff(inputs=inputs_auditoria)
+            self._salvar_metricas(resultado_auditoria, "Auditoria")
+
+            ok, auditoria = validar_auditoria(resultado_auditoria.tasks_output[-1])
+            if ok:
+                auditoria_json = json.dumps(auditoria.model_dump(), ensure_ascii=False)
+                log.info(f"Auditoria validada | vencedor={auditoria.vencedor_operacional}")
+            else:
+                log.warning(f"Auditoria inválida — {auditoria} | usando raw")
+                auditoria_json = resultado_auditoria.raw
+
+        except Exception as e:
+            log.error(f"Auditoria falhou: {e}")
+            log.error(traceback.format_exc())
+            console.print(f"[bold red]Auditoria falhou: {e}[/bold red]")
+
+        duracao = (dt.now() - t0).total_seconds()
+        log.info(f"[2/3] Auditoria concluída em {duracao:.1f}s")
+
+        dados_auditoria = (
+            f"=== DADOS TÉCNICOS EXTRAÍDOS ===\n{dados_estruturados}"
+            f"\n\n=== AUDITORIA SRE ===\n{auditoria_json}"
+        )
+        self.state['dados_auditoria'] = dados_auditoria
+        return dados_auditoria
+
+    @listen(executar_auditoria)
     def executar_escrita(self, dados_auditoria):
         log = get_logger()
         t0 = dt.now()
-        console.print("\n[2/2] Iniciando Escrita e Validação...")
-        log.info(f"[2/2] Etapa Escrita iniciada | dados_auditoria={len(dados_auditoria)} chars")
+        console.print("\n[3/3] Iniciando Escrita e Validação...")
+        log.info(f"[3/3] Escrita iniciada | dados_auditoria={len(dados_auditoria)} chars")
         log.info(f"dados_auditoria preview: {dados_auditoria[:600]}")
 
-        inputs_escrita = self.inputs.copy()
-        inputs_escrita['dados_auditoria'] = dados_auditoria
+        inputs_escrita = {**self.inputs, 'dados_auditoria': dados_auditoria}
 
         crew_escrita = EscritaValidacaoCrew().crew()
         resultado_final = crew_escrita.kickoff(inputs=inputs_escrita)
@@ -117,7 +179,7 @@ class TechAnalysisFlow(Flow):
         self.state['resultado_final'] = resultado_final.raw
 
         duracao = (dt.now() - t0).total_seconds()
-        log.info(f"[2/2] Etapa Escrita concluída em {duracao:.1f}s")
+        log.info(f"[3/3] Escrita concluída em {duracao:.1f}s")
         log.info(f"resultado_final preview: {str(resultado_final.raw)[:600]}")
         return self.state['resultado_final']
 
