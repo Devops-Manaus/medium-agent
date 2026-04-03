@@ -1,8 +1,7 @@
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
-from crewai_tools import ScrapeWebsiteTool
 
-from tools.custom_tools import search_tool, final_answer_tool
+from tools.custom_tools import search_tool, final_answer_tool, smart_scrape_tool
 
 llm_researcher = LLM(model='ollama/qwen2.5:7b', base_url='http://localhost:11434', temperature=0.0)
 llm_lite = LLM(model='ollama/qwen2.5:7b', base_url='http://localhost:11434', temperature=0.0)
@@ -19,7 +18,7 @@ class PesquisaCrew():
     def researcher(self) -> Agent:
         return Agent(
             config=self.agents_config['researcher'],
-            tools=[search_tool, ScrapeWebsiteTool(), final_answer_tool],
+            tools=[search_tool, smart_scrape_tool, final_answer_tool],
             llm=llm_researcher,
             max_iter=15,
             max_retry_limit=2,

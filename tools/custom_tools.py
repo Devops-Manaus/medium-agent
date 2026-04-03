@@ -3,6 +3,7 @@ import os
 import re
 
 import requests
+from bs4 import BeautifulSoup
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -71,6 +72,143 @@ class FinalAnswerTool(BaseTool):
 
 
 final_answer_tool = FinalAnswerTool()
+
+
+# ============================================
+# SMART SCRAPE TOOL — extrai só o conteúdo real
+# ============================================
+
+_NOISE_TAGS = ["nav", "header", "footer", "aside", "script", "style", "noscript", "form", "button"]
+_NOISE_ATTRS = [
+    {"class": re.compile(r"nav|sidebar|menu|toc|breadcrumb|banner|cookie|ad-|promo|social|share|search|modal", re.I)},
+    {"role": re.compile(r"navigation|banner|complementary|search", re.I)},
+    {"id": re.compile(r"nav|sidebar|menu|toc|header|footer|cookie|ad-", re.I)},
+]
+_CONTENT_SELECTORS = [
+    "article", "main", '[role="main"]',
+    ".content", ".docs-content", ".markdown-body", ".post-content",
+    "#content", "#main", "#readme",
+]
+_MAX_CHARS = 4000
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; TechResearchBot/1.0)",
+    "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+}
+
+
+def _try_markdown_url(url: str) -> str | None:
+    """Tenta obter versão markdown da URL (llms.txt, .md, raw GitHub)."""
+    candidates = []
+
+    # GitHub: converte para raw content
+    if "github.com" in url and "/blob/" in url:
+        candidates.append(url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/"))
+
+    # Docker docs: tenta sufixo .md e llms.txt
+    if "docs.docker.com" in url:
+        path = url.rstrip("/")
+        candidates.append(path + ".md")
+        candidates.append(path + "/index.md")
+
+    for candidate in candidates:
+        try:
+            r = requests.get(candidate, timeout=10, headers=_HEADERS)
+            if r.ok and len(r.text) > 200:
+                return r.text[:_MAX_CHARS]
+        except Exception:
+            pass
+    return None
+
+
+def _extract_body(html: str) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Remove ruído estrutural
+    for tag in _NOISE_TAGS:
+        for el in soup.find_all(tag):
+            el.decompose()
+    for attrs in _NOISE_ATTRS:
+        for el in soup.find_all(attrs=attrs):
+            el.decompose()
+
+    # Tenta seletores de conteúdo principal
+    for selector in _CONTENT_SELECTORS:
+        node = soup.select_one(selector)
+        if node:
+            text = node.get_text(separator="\n", strip=True)
+            if len(text) > 300:
+                return text
+
+    # Fallback: body inteiro sem ruído
+    body = soup.find("body")
+    if body:
+        return body.get_text(separator="\n", strip=True)
+    return soup.get_text(separator="\n", strip=True)
+
+
+def _clean_text(text: str) -> str:
+    lines = [ln.strip() for ln in text.splitlines()]
+    # Remove linhas curtas que parecem links de menu (< 4 palavras)
+    lines = [ln for ln in lines if len(ln.split()) >= 4 or len(ln) == 0]
+    # Colapsa múltiplas linhas vazias
+    result, prev_blank = [], False
+    for ln in lines:
+        if ln == "":
+            if not prev_blank:
+                result.append(ln)
+            prev_blank = True
+        else:
+            result.append(ln)
+            prev_blank = False
+    return "\n".join(result).strip()
+
+
+class ScrapeInput(BaseModel):
+    website_url: str = Field(description="URL da página a ser lida")
+
+
+class SmartScrapeTool(BaseTool):
+    name: str = "Read a website content"
+    description: str = (
+        "Acessa uma URL e retorna APENAS o conteúdo técnico da página, "
+        "removendo menus, rodapés e sidebars. Use para ler documentação, "
+        "GitHub READMEs, artigos e threads."
+    )
+    args_schema: type[BaseModel] = ScrapeInput
+
+    def _run(self, website_url: str) -> str:
+        log = get_logger()
+        try:
+            # Tenta versão markdown primeiro (mais limpa)
+            md = _try_markdown_url(website_url)
+            if md:
+                log.info(f"SCRAPE_MD   {website_url} | {len(md)} chars (markdown)")
+                return md[:_MAX_CHARS]
+
+            r = requests.get(website_url, timeout=15, headers=_HEADERS)
+            r.raise_for_status()
+
+            raw_text = _extract_body(r.text)
+            clean = _clean_text(raw_text)
+
+            if len(clean) < 150:
+                log.warning(f"SCRAPE_THIN {website_url} | apenas {len(clean)} chars após limpeza")
+                return f"[Conteúdo insuficiente em {website_url} — apenas {len(clean)} caracteres extraídos]"
+
+            result = clean[:_MAX_CHARS]
+            log.info(f"SCRAPE_OK   {website_url} | {len(result)} chars")
+            return result
+
+        except requests.exceptions.HTTPError as e:
+            log.error(f"SCRAPE_HTTP {website_url} | {e}")
+            return f"[HTTP {e.response.status_code} ao acessar {website_url}]"
+        except requests.exceptions.RequestException as e:
+            log.error(f"SCRAPE_ERR  {website_url} | {e}")
+            return f"[Erro ao acessar {website_url}: {e}]"
+
+
+smart_scrape_tool = SmartScrapeTool()
 
 
 # ============================================
