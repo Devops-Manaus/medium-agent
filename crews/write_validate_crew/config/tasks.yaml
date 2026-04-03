@@ -4,6 +4,9 @@ draft_task:
     Use os dados técnicos e arquiteturais levantados na auditoria anterior:
     {dados_auditoria}
 
+    IDIOMA OBRIGATÓRIO: Todo o artigo DEVE ser escrito em português brasileiro.
+    Títulos, seções, conclusões e CTAs — tudo em português. Nunca escreva em inglês.
+
     VOZ E STORYTELLING:
     Escreva como um estudo técnico pessoal para a sua própria infraestrutura.
     Você colocou as ferramentas à prova em produção e deixou que elas se medissem sozinhas.
@@ -15,7 +18,7 @@ draft_task:
     - Se a auditoria informar que um dado não foi encontrado, NÃO INVENTE NÚMEROS. Use o formato exato: [PREENCHER MANUALMENTE: Inserir dado sobre X].
     - Se a auditoria for puramente qualitativa, foque nos mecanismos de engenharia.
   expected_output: >
-    Um rascunho denso e narrativo do artigo técnico, ancorado apenas nos dados fornecidos ou marcados com placeholders onde faltarem informações numéricas.
+    Um rascunho denso e narrativo do artigo técnico em português brasileiro, ancorado apenas nos dados fornecidos ou marcado com placeholders onde faltarem informações numéricas.
   agent: writer
 
 formatting_task:
@@ -34,9 +37,11 @@ formatting_task:
     - Remova obrigatoriamente qualquer tag <think> ou blocos de raciocínio interno do modelo.
     - O output final deve ser apenas o Markdown limpo.
 
-    CTA: Adicione um subtítulo final perguntando aos leitores sobre experiências semelhantes com {ferramentas_alvo}.
+    CTA: Adicione um subtítulo final em português perguntando aos leitores sobre experiências semelhantes com {ferramentas_alvo}.
+
+    IDIOMA: O output final deve estar 100% em português brasileiro. Nenhuma frase em inglês.
   expected_output: >
-    O artigo técnico perfeitamente formatado em Markdown para o Medium, pronto para revisão.
+    O artigo técnico perfeitamente formatado em Markdown para o Medium, em português brasileiro, pronto para revisão.
   agent: writer
 
 validation_task:

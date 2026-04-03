@@ -6,6 +6,7 @@ import requests
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from shared.logger import get_logger
 from shared.schemas import ExtracaoOutput, MatrizTradeOffs
 
 ARQUIVO_REFERENCIAS = 'output/referencias_pesquisa.txt'
@@ -38,7 +39,7 @@ class SearchTool(BaseTool):
                         "snippet": result.get("snippet")
                     })
 
-            print(f"[DEBUG] Query: '{query}' → {len(filtered_results)} resultados")
+            get_logger().info(f"SEARCH  query='{query}' → {len(filtered_results)} resultados")
 
             with open(ARQUIVO_REFERENCIAS, "a", encoding="utf-8") as f:
                 f.write(f"\n[Termo: '{query}']\n")
@@ -48,11 +49,28 @@ class SearchTool(BaseTool):
             return json.dumps(filtered_results, ensure_ascii=False)
 
         except requests.exceptions.RequestException as e:
-            print(f"[DEBUG] Erro na requisição: {e}")
+            get_logger().error(f"SEARCH_ERROR  query='{query}' → {e}")
             return json.dumps({"error": str(e)})
 
 
 search_tool = SearchTool()
+
+
+class FinalAnswerInput(BaseModel):
+    answer: str = Field(description="A resposta final da tarefa")
+
+
+class FinalAnswerTool(BaseTool):
+    name: str = "final_answer"
+    description: str = "Retorna a resposta final quando você completou a tarefa."
+    args_schema: type[BaseModel] = FinalAnswerInput
+    result_as_answer: bool = True
+
+    def _run(self, answer: str) -> str:
+        return answer
+
+
+final_answer_tool = FinalAnswerTool()
 
 
 # ============================================

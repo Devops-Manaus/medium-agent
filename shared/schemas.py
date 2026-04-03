@@ -1,5 +1,4 @@
 from typing import List
-
 from pydantic import BaseModel, Field
 
 
@@ -8,7 +7,6 @@ class FatoTecnico(BaseModel):
     arquitetura: str
     limitacoes_conhecidas: List[str]
     fontes: List[str]
-
 
 class ExtracaoOutput(BaseModel):
     fatos: List[FatoTecnico] = Field(

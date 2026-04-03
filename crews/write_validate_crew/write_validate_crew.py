@@ -1,8 +1,9 @@
+import os
 from datetime import datetime
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 
-llm_qa = LLM(model='ollama/llama3:8b', base_url='http://localhost:11434', temperature=0.0)
+llm_qa = LLM(model='ollama/qwen3.5:latest', base_url='http://localhost:11434', temperature=0.0)
 llm_writer = LLM(
     model='ollama/deepseek-r1:8b',
     base_url='http://localhost:11434',
@@ -51,6 +52,7 @@ class EscritaValidacaoCrew():
     @task
     def validation_task(self) -> Task:
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        os.makedirs('result', exist_ok=True)
         return Task(
             config=self.tasks_config['validation_task'],
             agent=self.fact_checker(),

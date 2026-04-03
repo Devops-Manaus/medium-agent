@@ -1,109 +1,126 @@
 research_task:
   description: >
-    PROTOCOLO DE EXTRAÇÃO SISTEMÁTICA E PESQUISA DIRECIONADA:
-    
-    Para CADA ferramenta em {ferramentas_alvo}, você DEVE encontrar links de documentações oficiais e discussões técnicas avançadas.
-    Faça consultas específicas usando a ferramenta, como:
-    - "[Nome da Ferramenta] resource limits constraints official documentation"
-    - "[Nome da Ferramenta] pricing egress network hidden costs"
-    
-    Extraia dos resultados:
-    - Arquitetura técnica real (focada em infraestrutura, não marketing).
-    - Limitações numéricas conhecidas (quotas, limites de concorrência).
-    - Fontes rastreáveis (URLs exatas).
-    
-    CONTEXTO: {requisito_tecnico}
-    
-    REGRAS ABSOLUTAS:
-    - Use APENAS a tool 'Search SerpAPI' para buscar informações.
-    - PROIBIDO inventar ferramentas. NUNCA tente chamar 'final_answer', 'snowflake' ou 'function_name'.
-    - Quando tiver os links e resumos, escreva a saída final imediatamente.
-    - Se uma informação exata (ex: custo de egress) não for encontrada após 3 buscas, registre os links oficiais encontrados e avance. Não entre em loop.
-    - Apenas fatos verificáveis. Zero introduções e zero conclusões.
+    PROTOCOLO DE PESQUISA OBRIGATÓRIA — TODAS AS FERRAMENTAS EM {ferramentas_alvo}:
+
+    Leia o campo {ferramentas_alvo} e identifique cada ferramenta listada.
+    Você DEVE pesquisar CADA ferramenta individualmente seguindo a ordem de fontes abaixo.
+    NÃO chame 'final_answer' antes de completar as buscas de TODAS as ferramentas.
+
+    ORDEM OBRIGATÓRIA DE FONTES (execute nesta sequência para cada ferramenta):
+
+    FONTE 1 — Documentação Oficial:
+      "[Nome da Ferramenta] {requisito_tecnico} official documentation"
+
+    FONTE 2 — GitHub (código, issues, changelogs reais):
+      "[Nome da Ferramenta] {requisito_tecnico} site:github.com"
+
+    FONTE 3 — Reddit (experiências reais de uso):
+      "[Nome da Ferramenta] {contexto} site:reddit.com"
+
+    FONTE 4 — Stack Overflow (problemas técnicos reais):
+      "[Nome da Ferramenta] {requisito_tecnico} site:stackoverflow.com"
+
+    Repita as 4 buscas para CADA ferramenta em {ferramentas_alvo}, na ordem em que aparecem.
+    Só chame 'final_answer' depois de concluir todas as buscas de todas as ferramentas.
+
+    REGRAS:
+    - Use APENAS a tool 'Search SerpAPI'.
+    - Registre os links e snippets separados por ferramenta e por tipo de fonte.
+    - Apenas fatos verificáveis. Sem introduções ou conclusões.
 
   expected_output: >
-    Texto em markdown listando links oficiais e os fatos técnicos encontrados nos resumos da busca.
-    Exemplo:
-    
+    Texto em markdown com uma seção por ferramenta de {ferramentas_alvo}.
+    Cada seção deve ter subseções por tipo de fonte:
+
     ## [Nome da Ferramenta]
-    - Arquitetura: [descrição baseada na busca]
-    - Limitações: [lista de limites encontrados ou "Não detalhado nos resultados"]
-    - Fontes: [urls]
+    ### Documentação Oficial
+    - [fatos e links encontrados]
+    ### GitHub
+    - [fatos e links encontrados]
+    ### Reddit
+    - [fatos e links encontrados]
+    ### Stack Overflow
+    - [fatos e links encontrados]
 
 deep_extraction_task:
   description: >
-    Utilize a 'SeleniumScrapingTool' para acessar os links encontrados na task anterior.
-    
-    REGRA ANTI-LOOP (CRÍTICA): 
-    - Escolha APENAS os 5 links mais promissores por ferramenta.
-    - NUNCA acesse o mesmo link duas vezes. 
-    - Após ler 3 links diferentes, PARE de usar a ferramenta de leitura e escreva o seu relatório final imediatamente.
-    
-    Você DEVE extrair dados numéricos e técnicos específicos sobre {ferramentas_alvo}:
-    1. Limites de concorrência e quotas de API.
-    2. Custos de transferência de dados (egress) e armazenamento.
-    3. Detalhes de arquitetura (ex: micro-particionamento).
-    
-    Se não encontrar a informação em 3 links, apenas escreva "Não encontrado" e siga em frente.
+    EXTRAÇÃO PROFUNDA — LEITURA DIRETA DAS PÁGINAS ENCONTRADAS:
+
+    Você receberá links de múltiplas fontes para as ferramentas em {ferramentas_alvo}.
+    Sua função é usar 'Read a website content' para ler os links mais relevantes
+    e extrair dados técnicos detalhados focados em: {requisito_tecnico}
+
+    REGRA CRÍTICA DE FERRAMENTA:
+    - Use EXCLUSIVAMENTE a tool 'Read a website content'.
+    - É COMPLETAMENTE PROIBIDO chamar 'Search SerpAPI' nesta task.
+    - Não faça novas buscas. Leia os links disponíveis no contexto.
+
+    PRIORIDADE DE LEITURA (leia nesta ordem quando disponível):
+    1. Documentação oficial
+    2. Issues/README do GitHub
+    3. Threads do Reddit ou Stack Overflow com mais votos
+
+    PASSO A PASSO:
+    1. Leia o output da task anterior e identifique as URLs por ferramenta e por fonte.
+    2. Para cada ferramenta em {ferramentas_alvo}, selecione os 3 links mais relevantes
+       considerando o contexto: {contexto} e requisito: {requisito_tecnico}.
+    3. Acesse cada link com 'Read a website content' e extraia dados técnicos.
+    4. NUNCA acesse o mesmo link duas vezes.
+    5. Após ler todos os links selecionados (máximo 3 por ferramenta), escreva o relatório.
+
+    Se um link não carregar, pule para o próximo sem repetir.
+    Se não encontrar uma informação, registre "Não encontrado" e avance.
+
   expected_output: >
-    Um relatório técnico cru contendo tabelas de limites e valores extraídos dos sites lidos.
-  agent: researcher
-  context: [research_task]
+    Relatório técnico com uma seção por ferramenta de {ferramentas_alvo}, focado em:
+    {requisito_tecnico}
+
+    Cada seção deve conter dados extraídos diretamente das páginas lidas:
+    limites técnicos, arquitetura, licenciamento, custos ou qualquer dado relevante
+    para o contexto: {contexto}
+    Inclua a URL de origem de cada dado extraído.
 
 structure_task:
   description: >
-    Transforme os dados brutos de pesquisa em JSON estruturado.
-    
-    Para cada ferramenta identificada na pesquisa, crie um objeto com:
-    - ferramenta: nome da ferramenta (string)
-    - arquitetura: descrição da arquitetura (string)
-    - limitacoes_conhecidas: lista de limitações (array de strings)
-    - fontes: lista de URLs (array de strings)
-    
-    REGRAS CRÍTICAS DE JSON:
-    - Use APENAS aspas duplas (") para strings
-    - NUNCA use backticks (`) ou aspas simples (')
-    - NUNCA use formatação markdown dentro das strings
-    - Escreva texto plano sem formatação especial
-    - Exemplo CORRETO: "limitacoes_conhecidas": ["A ferramenta X tem limite de configuracao"]
-    - Exemplo ERRADO: "limitacoes_conhecidas": ["A ferramenta X tem `limit` configuracao"]
-    
-    REGRAS DE FORMATAÇÃO:
-    - NÃO escreva introduções ou explicações
-    - NÃO use markdown code blocks
-    - Escreva APENAS o objeto JSON puro
-    - Sua resposta deve começar com { e terminar com }
+    Transforme os dados brutos da pesquisa em estrutura de dados padronizada.
+
+    Leia os dados de contexto e crie UMA entrada no array "fatos" para CADA ferramenta
+    que aparece em {ferramentas_alvo}. Se houver 3 ferramentas, o array terá 3 itens.
+    Se houver 2 ferramentas, o array terá 2 itens. Nunca omita uma ferramenta.
+
+    Para cada ferramenta, preencha:
+    - ferramenta: nome exato da ferramenta
+    - arquitetura: descrição técnica baseada nos dados lidos
+    - limitacoes_conhecidas: lista de limitações, limites ou restrições encontradas,
+      considerando o requisito: {requisito_tecnico}
+    - fontes: lista de URLs utilizadas (pode ser vazia se não houver)
+
+    Se os dados de uma ferramenta forem escassos, preencha com o que foi encontrado
+    e adicione "Dados insuficientes" em limitacoes_conhecidas.
+
+    NÃO escreva introduções. Apenas o JSON.
 
   expected_output: >
-    JSON puro sem backticks, sem markdown, sem formatação especial:
-    {"fatos":[{"ferramenta":"Ferramenta_Exemplo","arquitetura":"descricao","limitacoes_conhecidas":["limitacao 1","limitacao 2"],"fontes":["url1","url2"]}]}
+    Um objeto JSON válido com uma entrada por ferramenta de {ferramentas_alvo}:
+    {"fatos": [{"ferramenta": "Nome", "arquitetura": "descrição", "limitacoes_conhecidas": ["limite1"], "fontes": ["https://..."]}, ...]}
 
 audit_task:
   description: >
-    ANÁLISE OPERACIONAL PARA USO PRÓPRIO
-    
-    Dado o contexto: {contexto}
-    
-    Analise os dados estruturados e produza JSON com:
-    
-    1. vencedor_operacional: string com o nome da ferramenta vencedora
-    2. riscos_sre: array de strings com riscos identificados
-    3. custos_ocultos_finops: array de strings com custos ocultos
-    4. recomendacao_final: string com a decisão técnica
-    
-    CRITÉRIOS:
-    - Foco prático. Tome partido e escolha a melhor opção para rodar na sua infraestrutura.
-    - Avalie observabilidade, manutenibilidade e escalabilidade real.
-    - O que pode acordar o time às 3h.
-    
-    REGRAS CRÍTICAS DE FORMATAÇÃO E TIPAGEM:
-    - VOCÊ NÃO TEM NENHUMA TOOL DISPONÍVEL.
-    - PROIBIDO CRIAR DICIONÁRIOS INTERNOS. As chaves de arrays devem conter apenas STRINGS simples.
-    - ERRADO: "riscos_sre": [{"risco": "falha"}]
-    - CORRETO: "riscos_sre": ["falha de memoria", "timeout"]
-    - NÃO escreva qualquer introdução.
-    - NÃO use markdown code blocks (sem ```).
-    - Escreva APENAS o objeto JSON puro. Sua resposta deve começar com { e terminar com }.
+    ANÁLISE OPERACIONAL — CONTEXTO: {contexto}
+
+    Com base nos dados estruturados recebidos, produza uma auditoria técnica comparativa
+    focada em: {requisito_tecnico}
+
+    REGRA FUNDAMENTAL: Baseie toda a análise EXCLUSIVAMENTE nas ferramentas e dados
+    presentes no campo "fatos" do contexto. Não avalie nem mencione ferramentas
+    que não estejam nos dados recebidos. Não invente dados ausentes.
+
+    Analise e defina:
+    1. Vencedor operacional para o contexto "{contexto}" com base nos dados disponíveis
+    2. Riscos SRE identificados nos dados (falhas, gargalos, limitações operacionais)
+    3. Custos ocultos ou restrições relevantes para "{requisito_tecnico}"
+    4. Recomendação final objetiva e direta
 
   expected_output: >
-    {"vencedor_operacional":"Nome da ferramenta","riscos_sre":["risco 1","risco 2"],"custos_ocultos_finops":["custo 1","custo 2"],"recomendacao_final":"Decisão técnica fundamentada"}
+    Um objeto JSON válido seguindo exatamente este schema:
+    {"vencedor_operacional": "Nome da ferramenta", "riscos_sre": ["risco1", "risco2"], "custos_ocultos_finops": ["custo1", "custo2"], "recomendacao_final": "texto da recomendação"}
